@@ -17,22 +17,32 @@ struct Reponse {
     posted_items: Option<i32>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+struct SlackMessage {
+    text: String,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     twitter_api_bearer: String,
     keyword: String,
+    slack_webhook: String,
 }
 
 pub trait Shareable {
     fn title(&self) -> String;
     fn link(&self) -> String;
+    fn link_name(&self) -> String;
     fn message(&self) -> String {
-        format!("{} - {}", self.title(), self.link())
+        format!("<{}|{}>: {}", self.link(), self.link_name(), self.title())
     }
 }
 
 pub trait Cacheable {
     fn cache_key(&self) -> String;
+    fn never_share(&self) -> bool {
+        false
+    }
 }
 
 pub trait Cache {
@@ -53,11 +63,18 @@ impl Shareable for TwitterResponseItem {
     fn link(&self) -> String {
         format!("https://twitter.com/twitter/status/{}", self.id)
     }
+    fn link_name(&self) -> String {
+        ":bird: Twitter".to_string()
+    }
 }
 
 impl Cacheable for TwitterResponseItem {
     fn cache_key(&self) -> String {
-        format!("{}", self.id)
+        format!("twitter-{}", self.id)
+    }
+
+    fn never_share(&self) -> bool {
+        self.text.contains("RT") || self.text.starts_with("@")
     }
 }
 
@@ -156,11 +173,13 @@ fn filter_duplicate_twitter_items(
     let mut c = cache.write().unwrap();
 
     for item in resp.data {
-        if !c.contains(item.cache_key()) {
+        if c.contains(item.cache_key()) {
+            info!("{} already posted", item.cache_key());
+        } else if item.never_share() {
+            info!("{} should not be shared", item.link());
+        } else {
             items_to_post.push(item.clone());
             c.add(item.cache_key());
-        } else {
-            info!("{} already posted", item.cache_key());
         }
     }
     return items_to_post;
@@ -197,9 +216,25 @@ async fn root(
 
     let content = items_to_post
         .iter()
-        .map(|item| item.message())
+        .map(|item| format!("• {}", item.message()))
         .collect::<Vec<String>>();
     info!("Fetched response {:?}", content.join("\n").to_string());
+
+    let slack_webhook_url = config.slack_webhook;
+
+    let resp = SlackMessage {
+        text: content.join("\n"),
+    };
+
+    let res = reqwest::Client::new()
+        .post(slack_webhook_url)
+        .body(serde_json::to_string(&resp).unwrap())
+        .send()
+        .await;
+    match res {
+        Ok(_) => info!("ok"),
+        Err(x) => warn!("Error sending slack message: {:?}", x),
+    }
 
     let response = Reponse {
         status: String::from("ok"),
