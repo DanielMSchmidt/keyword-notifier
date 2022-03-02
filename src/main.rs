@@ -183,21 +183,15 @@ async fn root(
             format!("%23{}", config.keyword)
         )
     );
-    match twitter {
-        (Ok(first), Ok(second)) => {
-            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, first));
-            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, second))
-        }
-        (Ok(first), Err(second)) => {
-            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, first));
-            warn!("Twitter2: {}", second);
-        }
-        (Err(first), Ok(second)) => {
-            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, second));
-            warn!("Twitter1: {}", first);
-        }
-        (Err(err1), Err(err2)) => {
-            warn!("Twitter1: {}, Twitter2: {}", err1, err2)
+
+    for item in [twitter.0, twitter.1] {
+        match item {
+            Ok(resp) => {
+                items_to_post.extend(filter_duplicate_twitter_items(&cache, resp));
+            }
+            Err(err) => {
+                warn!("{}", err);
+            }
         }
     }
 
