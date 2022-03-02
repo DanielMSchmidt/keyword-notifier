@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Debug, Serialize, Clone)]
 struct Reponse {
@@ -20,6 +20,7 @@ struct Reponse {
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     twitter_api_bearer: String,
+    keyword: String,
 }
 
 pub trait Shareable {
@@ -120,16 +121,14 @@ async fn main() {
         .unwrap();
 }
 
-// basic handler that responds with a static string
-#[tracing::instrument]
-async fn root(
-    Extension(config): Extension<Config>,
-    Extension(cache): Extension<LocalCacheAccessor>,
-) -> impl IntoResponse {
-    // TODO: paramaterize cdktf
+async fn fetch_twitter_api(token: String, query: String) -> Result<TwitterResponse, String> {
+    let url = format!(
+        "https://api.twitter.com/2/tweets/search/recent?max_results=100&query={}",
+        query
+    );
     let resp = match reqwest::Client::new()
-        .get("https://api.twitter.com/2/tweets/search/recent?max_results=100&query=cdktf")
-        .bearer_auth(config.twitter_api_bearer)
+        .get(url)
+        .bearer_auth(token)
         .send()
         .await
     {
@@ -137,34 +136,68 @@ async fn root(
             Ok(json) => json,
             Err(err) => {
                 info!("{}", err);
-                return Json(Reponse {
-                    status: "error".to_string(),
-                    posted_items: None,
-                });
+                return Err(format!("{}", err));
             }
         },
         Err(e) => {
             info!("{}", e);
-            return Json(Reponse {
-                status: "error".to_string(),
-                posted_items: None,
-            });
+            return Err(format!("{}", e));
         }
     };
 
+    Ok(resp)
+}
+
+fn filter_duplicate_twitter_items(
+    cache: &LocalCacheAccessor,
+    resp: TwitterResponse,
+) -> Vec<TwitterResponseItem> {
     let mut items_to_post: Vec<TwitterResponseItem> = Vec::new();
+    let mut c = cache.write().unwrap();
 
-    // release the lock
-    {
-        let mut c = cache.write().unwrap();
+    for item in resp.data {
+        if !c.contains(item.cache_key()) {
+            items_to_post.push(item.clone());
+            c.add(item.cache_key());
+        } else {
+            info!("{} already posted", item.cache_key());
+        }
+    }
+    return items_to_post;
+}
 
-        for item in resp.data {
-            if !c.contains(item.cache_key()) {
-                items_to_post.push(item.clone());
-                c.add(item.cache_key());
-            } else {
-                info!("{} already posted", item.cache_key());
-            }
+// basic handler that responds with a static string
+#[tracing::instrument]
+async fn root(
+    Extension(config): Extension<Config>,
+    Extension(cache): Extension<LocalCacheAccessor>,
+) -> impl IntoResponse {
+    let mut items_to_post: Vec<TwitterResponseItem> = Vec::new();
+    let twitter = tokio::join!(
+        fetch_twitter_api(
+            config.twitter_api_bearer.clone(),
+            format!("{}", config.keyword)
+        ),
+        fetch_twitter_api(
+            config.twitter_api_bearer.clone(),
+            format!("%23{}", config.keyword)
+        )
+    );
+    match twitter {
+        (Ok(first), Ok(second)) => {
+            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, first));
+            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, second))
+        }
+        (Ok(first), Err(second)) => {
+            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, first));
+            warn!("Twitter2: {}", second);
+        }
+        (Err(first), Ok(second)) => {
+            items_to_post.append(&mut filter_duplicate_twitter_items(&cache, second));
+            warn!("Twitter1: {}", first);
+        }
+        (Err(err1), Err(err2)) => {
+            warn!("Twitter1: {}, Twitter2: {}", err1, err2)
         }
     }
 
