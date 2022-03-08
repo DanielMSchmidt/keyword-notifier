@@ -229,8 +229,8 @@ async fn fetch_stackoverflow_api(query: String) -> Result<StackOverflowResponse,
 fn filter_duplicate_twitter_items(
     cache: &LocalCacheAccessor,
     resp: TwitterResponse,
-) -> Vec<TwitterResponseItem> {
-    let mut items_to_post: Vec<TwitterResponseItem> = Vec::new();
+) -> Vec<Box<dyn Shareable>> {
+    let mut items_to_post: Vec<Box<dyn Shareable>> = Vec::new();
     let mut c = cache.write().unwrap();
 
     for item in resp.data {
@@ -239,18 +239,19 @@ fn filter_duplicate_twitter_items(
         } else if item.never_share() {
             info!("{} should not be shared", item.link());
         } else {
-            items_to_post.push(item.clone());
+            items_to_post.push(Box::new(item));
             c.add(item.cache_key());
         }
     }
-    return items_to_post;
+
+    items_to_post
 }
 
 fn filter_duplicate_stack_overflow_items(
     cache: &LocalCacheAccessor,
     resp: StackOverflowResponse,
-) -> Vec<StackOverflowQuestion> {
-    let mut items_to_post: Vec<StackOverflowQuestion> = Vec::new();
+) -> Vec<Box<dyn Shareable>> {
+    let mut items_to_post: Vec<Box<dyn Shareable>> = Vec::new();
     let mut c = cache.write().unwrap();
 
     for item in resp.items {
@@ -259,11 +260,12 @@ fn filter_duplicate_stack_overflow_items(
         } else if item.never_share() {
             info!("{} should not be shared", item.link());
         } else {
-            items_to_post.push(item);
+            items_to_post.push(Box::new(item));
             c.add(item.cache_key());
         }
     }
-    return items_to_post;
+
+    items_to_post
 }
 
 // basic handler that responds with a static string
@@ -272,7 +274,7 @@ async fn root(
     Extension(config): Extension<Config>,
     Extension(cache): Extension<LocalCacheAccessor>,
 ) -> impl IntoResponse {
-    let mut items_to_post: Vec<TwitterResponseItem> = Vec::new();
+    let mut items_to_post: Vec<Box<dyn Shareable>> = Vec::new();
     let reponses = tokio::join!(
         fetch_twitter_api(
             config.twitter_api_bearer.clone(),
