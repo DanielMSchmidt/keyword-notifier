@@ -44,24 +44,37 @@ struct StackOverflowResponse {
 // TODO: walk through pagination if needed
 async fn fetch_stackoverflow_api(query: String) -> Result<StackOverflowResponse, String> {
     let url = format!(
-        "https://api.stackexchange.com/search/advanced?site=stackoverflow.com&q={}",
+        "https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=activity&site=stackoverflow&q={}",
         query
     );
-    let resp = match reqwest::Client::new().get(url).send().await {
-        Ok(resp) => match resp.json::<StackOverflowResponse>().await {
-            Ok(json) => json,
-            Err(err) => {
-                info!("{}", err);
-                return Err(format!("{}", err));
+    let resp = match reqwest::Client::builder()
+        .gzip(true)
+        .build()
+        .unwrap()
+        .get(url)
+        .header("Accept", "application/json; charset=utf-8")
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            // debug!("Response: {:?}", resp.json().await.unwrap());
+            match resp.json::<StackOverflowResponse>().await {
+                Ok(json) => json,
+                Err(err) => {
+                    error!("Could not parse stackoverflow API: {}", err);
+                    return Err(format!("{}", err));
+                }
             }
-        },
+        }
         Err(e) => {
-            info!("{}", e);
+            error!("Stackoverflow resopnded with an Error exit code: {}", e);
             return Err(format!("{}", e));
         }
     };
 
+    debug!("Stackoverflow response: {:?}", resp);
     Ok(resp)
+    // Err(String::from("debugging"))
 }
 
 async fn fetch(mut conn: mysql::PooledConn, keyword: String) -> mysql::Result<()> {

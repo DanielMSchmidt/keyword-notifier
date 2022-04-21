@@ -87,6 +87,11 @@ async fn fetch(
                 debug!("Checking if {} is known", item_id);
                 debug!("{:?}", known_shareables.iter().map(|item| item.id.clone()));
 
+                if item.text.contains("RT") {
+                    debug!("Skipping tweet {} because it is a retweet", item_id);
+                    return;
+                }
+
                 if known_shareables.iter().find(|x| x.id == item_id).is_none() {
                     shareables.push(Shareable {
                         id: item_id,

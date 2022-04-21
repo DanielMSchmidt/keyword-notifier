@@ -1,6 +1,11 @@
+use askama::Template;
 use axum::{
-    error_handling::HandleErrorLayer, extract::Extension, http::StatusCode, response::IntoResponse,
-    routing::get, Json, Router,
+    error_handling::HandleErrorLayer,
+    extract::Extension,
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+    Router,
 };
 use mysql::prelude::*;
 use mysql::*;
@@ -71,7 +76,43 @@ async fn main() {
         .unwrap();
 }
 
-// basic handler that responds with a static string
+#[derive(Template)]
+#[template(path = "base.html", escape = "none")]
+struct BaseTemplate {
+    content: String,
+}
+
+#[derive(Template)]
+#[template(path = "index.html", escape = "none")]
+struct IndexTemplate {
+    twitter_items: String,
+    stackoverflow_items: String,
+}
+
+#[derive(Template)]
+#[template(path = "error.html")]
+struct ErrorTemplate {
+    message: String,
+}
+
+struct HtmlTemplate<T>(T);
+
+impl<T> IntoResponse for HtmlTemplate<T>
+where
+    T: Template,
+{
+    fn into_response(self) -> Response {
+        match self.0.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to render template. Error: {}", err),
+            )
+                .into_response(),
+        }
+    }
+}
+
 #[tracing::instrument]
 async fn root(
     Extension(config): Extension<Config>,
@@ -93,18 +134,50 @@ async fn root(
         Ok(shareables) => {
             info!("Fetched {} items", shareables.len());
             debug!("Items: {:?}", shareables);
-            let response = Reponse {
-                status: String::from("ok"),
-                count: Some(shareables.len() as i32),
+
+            let twitter_items = shareables
+                .iter()
+                .filter(|shareable| shareable.source == "twitter")
+                .map(|shareable| {
+                    format!(
+                        "<li><a href=\"{}\">{}</a></li>",
+                        shareable.url, shareable.title
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join("");
+
+            let stackoverflow_items = shareables
+                .iter()
+                .filter(|shareable| shareable.source == "stackoverflow")
+                .map(|shareable| {
+                    format!(
+                        "<li><a href=\"{}\">{}</a></li>",
+                        shareable.url,
+                        shareable
+                            .title
+                            .replace(":question:", "❓")
+                            .replace(":white_check_mark:", "✅")
+                            .replace(":waiting-spin:", "🔄")
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join("");
+
+            let content = IndexTemplate {
+                twitter_items,
+                stackoverflow_items,
             };
-            Json(response)
+            let str = content.render().expect("Could not render template");
+            HtmlTemplate(BaseTemplate { content: str })
         }
         Err(e) => {
             error!("Error loading data: {}", e);
-            Json(Reponse {
-                status: String::from("error"),
-                count: None,
-            })
+            let content = ErrorTemplate {
+                message: format!("{}", e),
+            };
+            let str = content.render().expect("Could not render template");
+            HtmlTemplate(BaseTemplate { content: str })
         }
     }
 }
