@@ -2,6 +2,7 @@ use mysql::params;
 use mysql::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio::task::JoinError;
 use tokio::{task, time};
 use tracing::{debug, error, info};
 
@@ -66,7 +67,7 @@ async fn fetch_twitter_api(token: String, query: String) -> Result<TwitterRespon
     Ok(resp)
 }
 
-async fn fetch(
+pub async fn fetch(
     mut conn: mysql::PooledConn,
     twitter_api_bearer: String,
     keyword: String,
@@ -132,11 +133,7 @@ async fn fetch(
     Ok(())
 }
 
-#[tokio::main]
-async fn main() {
-    // initialize tracing
-    tracing_subscriber::fmt::init();
-
+pub async fn spawn_fetcher() -> Result<(), JoinError> {
     let forever = task::spawn(async {
         // load config
         let config = envy::from_env::<Config>().expect("Failed to load config");
@@ -157,7 +154,7 @@ async fn main() {
             .await;
             match res {
                 Ok(_) => {
-                    info!("Fetched tweets, waiting...");
+                    info!("Fetched Tweets, waiting...");
                 }
                 Err(e) => {
                     error!("Error: {}", e);
@@ -167,12 +164,5 @@ async fn main() {
         }
     });
 
-    match forever.await {
-        Ok(_) => {
-            info!("Done");
-        }
-        Err(e) => {
-            error!("Error: {}", e);
-        }
-    }
+    forever.await
 }

@@ -38,6 +38,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "axum",
+ "chrono",
+ "envy",
+ "mysql",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -466,35 +485,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
 dependencies = [
  "instant",
-]
-
-[[package]]
-name = "fetcher-stackoverflow"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "envy",
- "mysql",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "fetcher-twitter"
-version = "0.1.0"
-dependencies = [
- "envy",
- "mysql",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -2194,23 +2184,6 @@ name = "wasm-bindgen-shared"
 version = "0.2.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d554b7f530dee5964d9a9468d95c1f8b8acae4f282807e7d27d4b03099a46744"
-
-[[package]]
-name = "web"
-version = "0.1.0"
-dependencies = [
- "askama",
- "axum",
- "envy",
- "mysql",
- "serde",
- "serde_json",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "web-sys"

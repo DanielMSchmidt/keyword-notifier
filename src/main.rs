@@ -1,3 +1,4 @@
+mod fetcher;
 use askama::Template;
 use axum::{
     error_handling::HandleErrorLayer,
@@ -15,6 +16,9 @@ use std::time::Duration;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
 use tracing::{debug, error, info};
+
+use self::fetcher::stackoverflow::spawn_fetcher as fetch_stackoverflow;
+use self::fetcher::twitter::spawn_fetcher as fetch_twitter;
 
 #[derive(Debug, Serialize, Clone)]
 struct Reponse {
@@ -70,10 +74,15 @@ async fn main() {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let web_task = axum::Server::bind(&addr).serve(app.into_make_service());
+
+    match tokio::join!(web_task, fetch_twitter(), fetch_stackoverflow()) {
+        (Ok(_), Ok(_), Ok(_)) => info!("Done without errors"),
+        (a, b, c) => error!(
+            "Error found, web: {:#?}, twitter: {:#?}, stackoverflow: {:#?}",
+            a, b, c
+        ),
+    }
 }
 
 #[derive(Template)]
