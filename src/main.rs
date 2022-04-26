@@ -27,12 +27,17 @@ struct Reponse {
     count: Option<i32>,
 }
 
+fn default_port() -> u16 {
+    3000
+}
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     database_url: String,
     twitter_api_bearer: String,
     keyword: String,
     interval_in_sec: u64,
+    #[serde(default = "default_port")]
+    port: u16,
 }
 
 #[tokio::main]
@@ -68,7 +73,7 @@ async fn main() {
             .into_inner(),
     );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::debug!("listening on {}", addr);
     let web_task = axum::Server::bind(&addr).serve(app.into_make_service());
 
