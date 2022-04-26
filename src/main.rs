@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
+use fetcher::base::Shareable;
 use mysql::prelude::*;
 use mysql::*;
 use serde::{Deserialize, Serialize};
@@ -32,15 +33,6 @@ struct Config {
     twitter_api_bearer: String,
     keyword: String,
     interval_in_sec: u64,
-}
-
-#[derive(Deserialize, Debug, Clone, Serialize)]
-struct Shareable {
-    id: String,
-    title: String,
-    date: String,
-    url: String,
-    source: String,
 }
 
 #[tokio::main]
@@ -85,10 +77,14 @@ async fn main() {
         fetch_twitter(
             config.interval_in_sec.clone(),
             pool_arc.clone(),
-            config.twitter_api_bearer.clone(),
-            config.keyword.clone()
+            config.keyword.clone(),
+            config.twitter_api_bearer.clone()
         ),
-        fetch_stackoverflow()
+        fetch_stackoverflow(
+            config.interval_in_sec.clone(),
+            pool_arc.clone(),
+            config.keyword.clone()
+        )
     ) {
         (Ok(_), Ok(_), Ok(_)) => info!("Done without errors"),
         (a, b, c) => error!(
