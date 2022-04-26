@@ -73,7 +73,7 @@ async fn main() {
             .into_inner(),
     );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     tracing::debug!("listening on {}", addr);
     let web_task = axum::Server::bind(&addr).serve(app.into_make_service());
 
@@ -139,7 +139,7 @@ where
 #[tracing::instrument]
 async fn root(
     Extension(config): Extension<Config>,
-    Extension(pool): Extension<Pool>,
+    Extension(pool): Extension<Arc<Pool>>,
 ) -> impl IntoResponse {
     let mut conn = pool.get_conn().expect("Failed to get connection");
     let query_result = conn.query_map(
