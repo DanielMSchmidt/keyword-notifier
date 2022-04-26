@@ -75,7 +75,6 @@ async fn fetch_stackoverflow_api(query: String) -> Result<StackOverflowResponse,
 
     debug!("Stackoverflow response: {:?}", resp);
     Ok(resp)
-    // Err(String::from("debugging"))
 }
 
 async fn fetch(mut conn: mysql::PooledConn, keyword: String) -> mysql::Result<()> {

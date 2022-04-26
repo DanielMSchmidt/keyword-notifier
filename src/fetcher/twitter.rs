@@ -1,6 +1,7 @@
 use mysql::params;
 use mysql::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinError;
 use tokio::{task, time};
@@ -133,25 +134,18 @@ pub async fn fetch(
     Ok(())
 }
 
-pub async fn spawn_fetcher() -> Result<(), JoinError> {
-    let forever = task::spawn(async {
-        // load config
-        let config = envy::from_env::<Config>().expect("Failed to load config");
+pub async fn spawn_fetcher(
+    interval_in_sec: u64,
+    pool: Arc<mysql::Pool>,
+    twitter_api_bearer: String,
+    keyword: String,
+) -> Result<(), JoinError> {
+    let forever = task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(interval_in_sec.clone()));
 
-        let builder =
-            mysql::OptsBuilder::from_opts(mysql::Opts::from_url(&config.database_url).unwrap());
-        let mut interval = time::interval(Duration::from_secs(config.interval_in_sec));
-
-        let pool = mysql::Pool::new(builder.ssl_opts(mysql::SslOpts::default()))
-            .expect("Failed to initialize mysql");
         loop {
             let conn = pool.get_conn().expect("Failed to get connection");
-            let res = fetch(
-                conn,
-                config.twitter_api_bearer.clone(),
-                config.keyword.clone(),
-            )
-            .await;
+            let res = fetch(conn, twitter_api_bearer.clone(), keyword.clone()).await;
             match res {
                 Ok(_) => {
                     info!("Fetched Tweets, waiting...");

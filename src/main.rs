@@ -11,8 +11,8 @@ use axum::{
 use mysql::prelude::*;
 use mysql::*;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use std::time::Duration;
+use std::{net::SocketAddr, sync::Arc};
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
 use tracing::{debug, error, info};
@@ -29,6 +29,9 @@ struct Reponse {
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     database_url: String,
+    twitter_api_bearer: String,
+    keyword: String,
+    interval_in_sec: u64,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -52,6 +55,7 @@ async fn main() {
         mysql::OptsBuilder::from_opts(mysql::Opts::from_url(&config.database_url).unwrap());
     let pool = mysql::Pool::new(builder.ssl_opts(mysql::SslOpts::default()))
         .expect("Failed to initialize mysql");
+    let pool_arc = Arc::new(pool);
 
     let app = Router::new().route("/", get(root)).layer(
         ServiceBuilder::new()
@@ -67,8 +71,8 @@ async fn main() {
             }))
             .timeout(Duration::from_secs(5))
             .layer(TraceLayer::new_for_http())
-            .layer(AddExtensionLayer::new(config))
-            .layer(AddExtensionLayer::new(pool))
+            .layer(AddExtensionLayer::new(config.clone()))
+            .layer(AddExtensionLayer::new(pool_arc.clone()))
             .into_inner(),
     );
 
@@ -76,7 +80,16 @@ async fn main() {
     tracing::debug!("listening on {}", addr);
     let web_task = axum::Server::bind(&addr).serve(app.into_make_service());
 
-    match tokio::join!(web_task, fetch_twitter(), fetch_stackoverflow()) {
+    match tokio::join!(
+        web_task,
+        fetch_twitter(
+            config.interval_in_sec.clone(),
+            pool_arc.clone(),
+            config.twitter_api_bearer.clone(),
+            config.keyword.clone()
+        ),
+        fetch_stackoverflow()
+    ) {
         (Ok(_), Ok(_), Ok(_)) => info!("Done without errors"),
         (a, b, c) => error!(
             "Error found, web: {:#?}, twitter: {:#?}, stackoverflow: {:#?}",
