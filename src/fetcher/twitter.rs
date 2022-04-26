@@ -16,19 +16,38 @@ struct TwitterResponseItem {
     created_at: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+struct TwitterResponseMeta {
+    next_token: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct TwitterResponse {
     data: Vec<TwitterResponseItem>,
+    meta: TwitterResponseMeta,
 }
 
-async fn fetch_twitter_api(token: String, query: String) -> Result<TwitterResponse, String> {
-    let url = format!(
+async fn fetch_twitter_api(
+    token: String,
+    query: String,
+    next_token: Option<String>,
+) -> Result<Vec<Shareable>, String> {
+    let mut shareables: Vec<Shareable> = vec![];
+    let url = if next_token.is_none() {
+        format!(
         "https://api.twitter.com/2/tweets/search/recent?max_results=100&tweet.fields=created_at&query={}",
         query
-    );
+    )
+    } else {
+        format!(
+        "https://api.twitter.com/2/tweets/search/recent?max_results=100&tweet.fields=created_at&query={}&next_token={}",
+        query,
+        next_token.unwrap()
+    )
+    };
     let resp = match reqwest::Client::new()
         .get(url)
-        .bearer_auth(token)
+        .bearer_auth(token.clone())
         .send()
         .await
     {
@@ -45,7 +64,31 @@ async fn fetch_twitter_api(token: String, query: String) -> Result<TwitterRespon
         }
     };
 
-    Ok(resp)
+    resp.data.iter().for_each(|item| {
+        let item_id = format!("twitter-{}", item.id.clone());
+
+        if item.text.contains("RT") {
+            debug!("Skipping tweet {} because it is a retweet", item_id);
+            return;
+        }
+
+        shareables.push(Shareable {
+            id: item_id,
+            title: item.text.clone(),
+            date: item.created_at.clone(),
+            url: format!("https://twitter.com/twitter/status/{}", item.id),
+            source: String::from("twitter"),
+        });
+    });
+
+    if resp.meta.next_token.is_some() {
+        let pagination_result =
+            fetch_twitter_api(token.clone(), query, resp.meta.next_token).await?;
+
+        shareables.extend(pagination_result);
+    }
+
+    Ok(shareables)
 }
 
 pub async fn fetch(
@@ -54,48 +97,30 @@ pub async fn fetch(
     keyword: String,
 ) -> mysql::Result<()> {
     info!("Fetching tweets");
-    let tweet_result = fetch_twitter_api(twitter_api_bearer.clone(), keyword.to_string()).await;
+    let result = fetch_twitter_api(twitter_api_bearer.clone(), keyword.to_string(), None).await;
 
-    let mut shareables: Vec<Shareable> = vec![];
-    match tweet_result {
-        Ok(data) => {
-            info!("Found {} tweets", data.data.len());
-            data.data.iter().for_each(|item| {
-                let item_id = format!("twitter-{}", item.id.clone());
-
-                if item.text.contains("RT") {
-                    debug!("Skipping tweet {} because it is a retweet", item_id);
-                    return;
-                }
-
-                shareables.push(Shareable {
-                    id: item_id,
-                    title: item.text.clone(),
-                    date: item.created_at.clone(),
-                    url: format!("https://twitter.com/twitter/status/{}", item.id),
-                    source: String::from("twitter"),
-                });
-            });
+    match result {
+        Ok(shareables) => {
+            info!("Found {} tweets", shareables.len());
+            conn.exec_batch(
+                r"INSERT IGNORE INTO shareables (id, title, url, date, source)
+              VALUES (:id, :title, :url, :date, :source)",
+                shareables.iter().map(|p| {
+                    params! {
+                        "id" => p.id.clone(),
+                        "title" => p.title.clone(),
+                        "url" => p.url.clone(),
+                        "date" => p.date.clone(),
+                        "source" => p.source.clone()
+                    }
+                }),
+            )?;
         }
         Err(e) => {
             error!("Could not fetch tweets, aborting{}", e);
             return Ok(());
         }
     }
-
-    conn.exec_batch(
-        r"INSERT IGNORE INTO shareables (id, title, url, date, source)
-      VALUES (:id, :title, :url, :date, :source)",
-        shareables.iter().map(|p| {
-            params! {
-                "id" => p.id.clone(),
-                "title" => p.title.clone(),
-                "url" => p.url.clone(),
-                "date" => p.date.clone(),
-                "source" => p.source.clone()
-            }
-        }),
-    )?;
 
     info!("Done fetching  tweets");
     Ok(())
