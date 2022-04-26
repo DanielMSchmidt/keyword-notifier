@@ -42,6 +42,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "askama",
+ "async-recursion",
  "axum",
  "chrono",
  "envy",
@@ -121,6 +122,17 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "async-recursion"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cda8f4bcc10624c4e85bc66b3f452cca98cfa5ca002dc83a16aad2367641bea"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

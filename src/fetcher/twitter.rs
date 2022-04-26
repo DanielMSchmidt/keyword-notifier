@@ -1,3 +1,4 @@
+use async_recursion::async_recursion;
 use mysql::params;
 use mysql::prelude::*;
 use serde::Deserialize;
@@ -27,6 +28,7 @@ struct TwitterResponse {
     meta: TwitterResponseMeta,
 }
 
+#[async_recursion]
 async fn fetch_twitter_api(
     token: String,
     query: String,
