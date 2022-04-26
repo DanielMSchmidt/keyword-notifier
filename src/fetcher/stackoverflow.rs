@@ -62,7 +62,7 @@ async fn fetch_stackoverflow_api(query: String) -> Result<StackOverflowResponse,
 async fn fetch(mut conn: mysql::PooledConn, keyword: String) -> mysql::Result<()> {
     info!("Fetching StackOverflow Questions");
 
-    let so_result = fetch_stackoverflow_api(format!("{}", keyword)).await;
+    let so_result = fetch_stackoverflow_api(keyword.to_string()).await;
 
     let mut shareables: Vec<Shareable> = vec![];
     match so_result {

@@ -54,7 +54,7 @@ pub async fn fetch(
     keyword: String,
 ) -> mysql::Result<()> {
     info!("Fetching tweets");
-    let tweet_result = fetch_twitter_api(twitter_api_bearer.clone(), format!("{}", keyword)).await;
+    let tweet_result = fetch_twitter_api(twitter_api_bearer.clone(), keyword.to_string()).await;
 
     let mut shareables: Vec<Shareable> = vec![];
     match tweet_result {
@@ -109,7 +109,7 @@ pub async fn spawn_fetcher(
     twitter_api_bearer: String,
 ) -> Result<(), JoinError> {
     let forever = task::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(interval_in_sec.clone()));
+        let mut interval = time::interval(Duration::from_secs(interval_in_sec));
 
         loop {
             let conn = pool.get_conn().expect("Failed to get connection");

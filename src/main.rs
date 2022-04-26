@@ -80,13 +80,13 @@ async fn main() {
     match tokio::join!(
         web_task,
         fetch_twitter(
-            config.interval_in_sec.clone(),
+            config.interval_in_sec,
             pool_arc.clone(),
             config.keyword.clone(),
             config.twitter_api_bearer.clone()
         ),
         fetch_stackoverflow(
-            config.interval_in_sec.clone(),
+            config.interval_in_sec,
             pool_arc.clone(),
             config.keyword.clone()
         )
