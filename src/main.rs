@@ -73,7 +73,7 @@ async fn main() {
             .into_inner(),
     );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     tracing::debug!("listening on {}", addr);
     let web_task = axum::Server::bind(&addr).serve(app.into_make_service());
 
