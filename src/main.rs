@@ -1,43 +1,25 @@
+mod config;
 mod fetcher;
-use askama::Template;
-use axum::{
-    error_handling::HandleErrorLayer,
-    extract::Extension,
-    http::StatusCode,
-    response::{Html, IntoResponse, Response},
-    routing::get,
-    Router,
-};
-use fetcher::base::Shareable;
-use mysql::prelude::*;
+mod routes;
+use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::get, Router};
 use mysql::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
-use tracing::{debug, error, info};
+use tracing::{error, info};
+
+use crate::config::Config;
 
 use self::fetcher::stackoverflow::spawn_fetcher as fetch_stackoverflow;
 use self::fetcher::twitter::spawn_fetcher as fetch_twitter;
+use self::routes::root::root as root_route;
 
 #[derive(Debug, Serialize, Clone)]
 struct Reponse {
     status: String,
     count: Option<i32>,
-}
-
-fn default_port() -> u16 {
-    3000
-}
-#[derive(Deserialize, Debug, Clone)]
-struct Config {
-    database_url: String,
-    twitter_api_bearer: String,
-    keyword: String,
-    interval_in_sec: u64,
-    #[serde(default = "default_port")]
-    port: u16,
 }
 
 #[tokio::main]
@@ -54,7 +36,7 @@ async fn main() {
         .expect("Failed to initialize mysql");
     let pool_arc = Arc::new(pool);
 
-    let app = Router::new().route("/", get(root)).layer(
+    let app = Router::new().route("/", get(root_route)).layer(
         ServiceBuilder::new()
             .layer(HandleErrorLayer::new(|error: BoxError| async move {
                 if error.is::<tower::timeout::error::Elapsed>() {
@@ -96,111 +78,5 @@ async fn main() {
             "Error found, web: {:#?}, twitter: {:#?}, stackoverflow: {:#?}",
             a, b, c
         ),
-    }
-}
-
-#[derive(Template)]
-#[template(path = "base.html", escape = "none")]
-struct BaseTemplate {
-    content: String,
-}
-
-#[derive(Template)]
-#[template(path = "index.html", escape = "none")]
-struct IndexTemplate {
-    twitter_items: String,
-    stackoverflow_items: String,
-}
-
-#[derive(Template)]
-#[template(path = "error.html")]
-struct ErrorTemplate {
-    message: String,
-}
-
-struct HtmlTemplate<T>(T);
-
-impl<T> IntoResponse for HtmlTemplate<T>
-where
-    T: Template,
-{
-    fn into_response(self) -> Response {
-        match self.0.render() {
-            Ok(html) => Html(html).into_response(),
-            Err(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to render template. Error: {}", err),
-            )
-                .into_response(),
-        }
-    }
-}
-
-#[tracing::instrument]
-async fn root(
-    Extension(config): Extension<Config>,
-    Extension(pool): Extension<Arc<Pool>>,
-) -> impl IntoResponse {
-    let mut conn = pool.get_conn().expect("Failed to get connection");
-    let query_result = conn.query_map(
-        "SELECT id, title, url, date, source from shareables",
-        |(id, title, url, date, source)| Shareable {
-            id,
-            title,
-            date,
-            url,
-            source,
-        },
-    );
-
-    match query_result {
-        Ok(shareables) => {
-            info!("Fetched {} items", shareables.len());
-            debug!("Items: {:?}", shareables);
-
-            let twitter_items = shareables
-                .iter()
-                .filter(|shareable| shareable.source == "twitter")
-                .map(|shareable| {
-                    format!(
-                        "<li><a href=\"{}\">{}</a></li>",
-                        shareable.url, shareable.title
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("");
-
-            let stackoverflow_items = shareables
-                .iter()
-                .filter(|shareable| shareable.source == "stackoverflow")
-                .map(|shareable| {
-                    format!(
-                        "<li><a href=\"{}\">{}</a></li>",
-                        shareable.url,
-                        shareable
-                            .title
-                            .replace(":question:", "❓")
-                            .replace(":white_check_mark:", "✅")
-                            .replace(":waiting-spin:", "🔄")
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("");
-
-            let content = IndexTemplate {
-                twitter_items,
-                stackoverflow_items,
-            };
-            let str = content.render().expect("Could not render template");
-            HtmlTemplate(BaseTemplate { content: str })
-        }
-        Err(e) => {
-            error!("Error loading data: {}", e);
-            let content = ErrorTemplate {
-                message: format!("{}", e),
-            };
-            let str = content.render().expect("Could not render template");
-            HtmlTemplate(BaseTemplate { content: str })
-        }
     }
 }
