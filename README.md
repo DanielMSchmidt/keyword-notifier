@@ -1,4 +1,4 @@
-# keyword-notifier
+# keyword-notifier [![rust-clippy analyze](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/rust-clippy.yml) [![rust-clippy analyze](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/rust-clippy.yml) [![Docker](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/DanielMSchmidt/keyword-notifier/actions/workflows/docker-publish.yml)
 
 Very much a learning project with no intention to be used in production.
 
