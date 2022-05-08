@@ -1,6 +1,9 @@
 mod config;
 mod fetcher;
 mod routes;
+mod tracing;
+
+use crate::tracing::{error, info};
 use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::get, Router};
 use mysql::*;
 use serde::Serialize;
@@ -8,7 +11,6 @@ use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
-use tracing::{error, info};
 
 use crate::config::Config;
 

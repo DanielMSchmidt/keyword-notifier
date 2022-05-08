@@ -11,4 +11,6 @@ pub struct Config {
     pub interval_in_sec: u64,
     #[serde(default = "default_port")]
     pub port: u16,
+    pub honeycomb_api_key: Option<String>,
+    pub honeycomb_dataset: Option<String>,
 }

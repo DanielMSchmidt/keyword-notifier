@@ -12,11 +12,19 @@ axum = "0.5"
 chrono = "0.4"
 envy = "0.4"
 mysql = "*"
+opentelemetry = { version = "0.17.0", features = ["async-std", "rt-tokio", "metrics", "serialize"] }
+opentelemetry-otlp = { version = "0.10.0", features = ["default"] }
 reqwest = { version = "0.11", features = ["json", "gzip"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.17", features = ["full"] }
+tokio_tracing = { package = "tracing", version = "0.1.29" }
 tower = { version = "0.4", features = ["util", "timeout"] }
 tower-http = { version = "0.3", features = ["add-extension", "trace"] }
-tracing = "0.1"
-tracing-subscriber = { version="0.3", features = ["env-filter"] }
+tracing-attributes = "0.1.18"
+tracing-fmt = "0.1.1"
+tracing-honeycomb = "0.4.3"
+tracing-opentelemetry = "0.17.2"
+tracing-serde = "0.1.2"
+tracing-subscriber = { version = "0.3.7", features = ["fmt", "json", "env-filter"]}
+tracing-timing = "0.6.0"
