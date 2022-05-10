@@ -1,9 +1,7 @@
 mod config;
 mod fetcher;
 mod routes;
-mod tracing;
 
-use crate::tracing::{error, info};
 use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::get, Router};
 use mysql::*;
 use serde::Serialize;
@@ -11,6 +9,7 @@ use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
+use tracing::{error, info, initialize_tracing, shutdown_tracer_provider, tracing_config};
 
 use crate::config::Config;
 
@@ -26,9 +25,9 @@ struct Reponse {
 
 #[tokio::main]
 async fn main() {
-    // initialize tracing
-    tracing_subscriber::fmt::init();
+    let tracing_config = tracing_config("KEYWORD_NOTIFIER_");
 
+    initialize_tracing(&tracing_config);
     // load config
     let config = envy::from_env::<Config>().expect("Failed to load config");
 
@@ -81,4 +80,6 @@ async fn main() {
             a, b, c
         ),
     }
+
+    shutdown_tracer_provider()
 }

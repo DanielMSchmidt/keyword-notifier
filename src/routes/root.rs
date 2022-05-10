@@ -8,7 +8,7 @@ use axum::{
 use mysql::prelude::*;
 use mysql::*;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::*;
 
 use crate::config::Config;
 
