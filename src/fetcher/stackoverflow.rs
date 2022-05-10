@@ -59,6 +59,7 @@ async fn fetch_stackoverflow_api(query: String) -> Result<StackOverflowResponse,
     Ok(resp)
 }
 
+#[tracing::instrument]
 async fn fetch(mut conn: mysql::PooledConn, keyword: String) -> mysql::Result<()> {
     info!("Fetching StackOverflow Questions");
 

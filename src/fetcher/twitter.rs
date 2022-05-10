@@ -93,6 +93,7 @@ async fn fetch_twitter_api(
     Ok(shareables)
 }
 
+#[tracing::instrument]
 pub async fn fetch(
     mut conn: mysql::PooledConn,
     twitter_api_bearer: String,
