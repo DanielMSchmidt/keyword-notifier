@@ -1,5 +1,7 @@
-<body>
-  <h1>An Error occured</h1>
+{% extends "base.html" %} {% block title %}Error{% endblock %} {% block head %}
+<style></style>
+{% endblock %} {% block content %}
+<h1>An Error occured</h1>
 
-  <p>{{ message }}</p>
-</body>
+<p>{{ message }}</p>
+{% endblock %}

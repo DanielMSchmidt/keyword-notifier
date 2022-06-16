@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
+
 use fetcher::base::Shareable;
 use mysql::prelude::*;
 use mysql::*;
@@ -102,14 +103,13 @@ async fn main() {
 #[derive(Template)]
 #[template(path = "base.html", escape = "none")]
 struct BaseTemplate {
-    content: String,
+    title: String,
 }
 
 #[derive(Template)]
 #[template(path = "index.html", escape = "none")]
 struct IndexTemplate {
-    twitter_items: String,
-    stackoverflow_items: String,
+    items: Vec<Shareable>,
 }
 
 #[derive(Template)]
@@ -158,49 +158,36 @@ async fn root(
             info!("Fetched {} items", shareables.len());
             debug!("Items: {:?}", shareables);
 
-            let twitter_items = shareables
-                .iter()
-                .filter(|shareable| shareable.source == "twitter")
-                .map(|shareable| {
-                    format!(
-                        "<li><a href=\"{}\">{}</a></li>",
-                        shareable.url, shareable.title
-                    )
+            let sanitized_shareable = shareables
+                .into_iter()
+                .map(|item| Shareable {
+                    id: item.id,
+                    title: item
+                        .title
+                        .replace(":question:", "❓")
+                        .replace(":white_check_mark:", "✅")
+                        .replace(":waiting-spin:", "🔄"),
+                    date: item.date,
+                    url: item.url,
+                    source: item.source,
                 })
-                .collect::<Vec<String>>()
-                .join("");
+                .collect::<Vec<Shareable>>();
+                
+                // TODO: implement proper sorting
+                // sanitized_shareable.sort_by_key(|item| item.date);
 
-            let stackoverflow_items = shareables
-                .iter()
-                .filter(|shareable| shareable.source == "stackoverflow")
-                .map(|shareable| {
-                    format!(
-                        "<li><a href=\"{}\">{}</a></li>",
-                        shareable.url,
-                        shareable
-                            .title
-                            .replace(":question:", "❓")
-                            .replace(":white_check_mark:", "✅")
-                            .replace(":waiting-spin:", "🔄")
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("");
 
-            let content = IndexTemplate {
-                twitter_items,
-                stackoverflow_items,
-            };
-            let str = content.render().expect("Could not render template");
-            HtmlTemplate(BaseTemplate { content: str })
+            HtmlTemplate(IndexTemplate {
+                items: sanitized_shareable,
+            })
+            .into_response()
         }
         Err(e) => {
             error!("Error loading data: {}", e);
-            let content = ErrorTemplate {
+            HtmlTemplate(ErrorTemplate {
                 message: format!("{}", e),
-            };
-            let str = content.render().expect("Could not render template");
-            HtmlTemplate(BaseTemplate { content: str })
+            })
+            .into_response()
         }
     }
 }
