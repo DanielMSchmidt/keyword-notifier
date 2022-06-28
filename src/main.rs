@@ -158,7 +158,7 @@ async fn root(
             info!("Fetched {} items", shareables.len());
             debug!("Items: {:?}", shareables);
 
-            let sanitized_shareable = shareables
+            let mut sanitized_shareable = shareables
                 .into_iter()
                 .map(|item| Shareable {
                     id: item.id,
@@ -171,10 +171,11 @@ async fn root(
                     url: item.url,
                     source: item.source,
                 })
+                .filter(|item| !item.title.contains("[Dependency Updated]"))
                 .collect::<Vec<Shareable>>();
-                
-                // TODO: implement proper sorting
-                // sanitized_shareable.sort_by_key(|item| item.date);
+
+                sanitized_shareable.sort_by(|a, b| b.cmp(a));
+
 
 
             HtmlTemplate(IndexTemplate {
