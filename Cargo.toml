@@ -12,7 +12,7 @@ axum = "0.5"
 chrono = "0.4"
 envy = "0.4"
 mysql = "*"
-reqwest = { version = "0.11", features = ["json", "gzip"] }
+reqwest = { version = "0.12", features = ["json", "gzip"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.19", features = ["full"] }
