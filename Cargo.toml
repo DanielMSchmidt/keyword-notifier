@@ -9,7 +9,7 @@ edition = "2021"
 askama = "0.11"
 async-recursion = "1.0.0"
 axum = "0.5"
-chrono = "0.4"
+chrono = "0.4.38"
 envy = "0.4"
 mysql = "*"
 reqwest = { version = "0.11", features = ["json", "gzip"] }
